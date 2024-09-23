@@ -1,0 +1,128 @@
+version: '3'
+services:
+
+  config:
+    image: mongo:latest # docker образ
+    restart: always
+    networks:
+      - app-network
+    volumes:
+      - config-data:/data/db
+    command:
+      [
+        "--configsvr",
+        "--replSet",
+        "config_server",
+        "--bind_ip_all",
+        "--port",
+        "27019"
+      ]
+    healthcheck:
+      test: [ "CMD", "mongo", "--eval", "db.adminCommand('ping')" ]
+      interval: 5s
+      start_period: 10s
+    deploy:
+      replicas: 2
+
+  router:
+    image: mongo:latest
+    restart: always
+    networks:
+      - app-network
+    command:
+      [
+        "mongos",
+        "--configdb",
+        "config_server/mongo-sharding-repl-config-1:27019,mongo-sharding-repl-config-2:27019",
+        "--bind_ip_all",
+        "--port",
+        "27017"
+      ]
+    healthcheck:
+      test: [ "CMD", "mongo", "--eval", "db.adminCommand('ping')" ]
+      interval: 5s
+      start_period: 10s
+    deploy:
+      replicas: 2
+
+  shard1:
+    image: mongo:latest
+    restart: always
+    networks:
+      - app-network
+    volumes:
+      - shard1-data:/data/db
+    command:
+      [
+        "--shardsvr",
+        "--replSet",
+        "rs01",
+        "--bind_ip_all",
+        "--port",
+        "27018"
+      ]
+    healthcheck:
+      test: [ "CMD", "mongo", "--eval", "db.adminCommand('ping')" ]
+      interval: 5s
+      start_period: 10s
+#    deploy:
+#      replicas: 3
+
+  shard2:
+    image: mongo:latest
+    restart: always
+    networks:
+      - app-network
+    volumes:
+      - shard2-data:/data/db
+    command:
+      [
+        "--shardsvr",
+        "--replSet",
+        "rs02",
+        "--bind_ip_all",
+        "--port",
+        "27018"
+      ]
+    healthcheck:
+      test: [ "CMD", "mongo", "--eval", "db.adminCommand('ping')" ]
+      interval: 5s
+      start_period: 10s
+#    deploy:
+#      replicas: 3
+
+  pymongo_api:
+    container_name: pymongo_api
+    networks:
+      - app-network
+    build:
+      context: api_app
+      dockerfile: Dockerfile
+    depends_on:
+      - shard1
+      - shard2
+    ports:
+      - 8080:8080
+    environment:
+      MONGODB_URL: "mongodb://mongo-sharding-repl-router-1:27017,mongo-sharding-repl-router-2:27017"
+      MONGODB_DATABASE_NAME: "somedb"
+
+
+networks:
+  app-network:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 173.17.0.0/16
+
+volumes:
+  config-data:
+  shard1-data:
+  shard2-data:
+
+
+
+# 1. отвязаться от имени папки!
+# 2. запустить с репликами
+# 3. понять почему не видно данные через роутеры?
