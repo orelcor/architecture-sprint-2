@@ -1,0 +1,232 @@
+version: '3'
+services:
+
+  config:
+    image: mongo:latest
+    restart: always
+    networks:
+      - app-network
+    volumes:
+      - config-data:/data/db
+    command:
+      [
+        "--configsvr",
+        "--replSet",
+        "config_server",
+        "--bind_ip_all",
+        "--port",
+        "27019"
+      ]
+    healthcheck:
+      test: [ "CMD", "mongo", "--eval", "db.adminCommand('ping')" ]
+      interval: 5s
+      start_period: 10s
+    deploy:
+      replicas: 2
+
+  router:
+    image: mongo:latest
+    restart: always
+    networks:
+      - app-network
+    command:
+      [
+        "mongos",
+        "--configdb",
+        "config_server/sharding-repl-cache-config-1:27019,sharding-repl-cache-config-2:27019",
+        "--bind_ip_all",
+        "--port",
+        "27017"
+      ]
+    healthcheck:
+      test: [ "CMD", "mongo", "--eval", "db.adminCommand('ping')" ]
+      interval: 5s
+      start_period: 10s
+    deploy:
+      replicas: 2
+
+  shard1-a:
+    container_name: shard1-a
+    hostname: shard1-a
+    image: mongo:latest
+    restart: always
+    networks:
+      - app-network
+    volumes:
+      - shard1-a-data:/data/db
+    command:
+      [
+        "--shardsvr",
+        "--replSet",
+        "rs01",
+        "--bind_ip_all",
+        "--port",
+        "27018"
+      ]
+    healthcheck:
+      test: [ "CMD", "mongo", "--eval", "db.adminCommand('ping')" ]
+      interval: 5s
+      start_period: 10s
+
+  shard1-b:
+    container_name: shard1-b
+    hostname: shard1-b
+    image: mongo:latest
+    restart: always
+    networks:
+      - app-network
+    volumes:
+      - shard1-b-data:/data/db
+    command:
+      [
+        "--shardsvr",
+        "--replSet",
+        "rs01",
+        "--bind_ip_all",
+        "--port",
+        "27018"
+      ]
+    healthcheck:
+      test: [ "CMD", "mongo", "--eval", "db.adminCommand('ping')" ]
+      interval: 5s
+      start_period: 10s
+
+  shard1-c:
+    container_name: shard1-c
+    hostname: shard1-c
+    image: mongo:latest
+    restart: always
+    networks:
+      - app-network
+    volumes:
+      - shard1-c-data:/data/db
+    command:
+      [
+        "--shardsvr",
+        "--replSet",
+        "rs01",
+        "--bind_ip_all",
+        "--port",
+        "27018"
+      ]
+    healthcheck:
+      test: [ "CMD", "mongo", "--eval", "db.adminCommand('ping')" ]
+      interval: 5s
+      start_period: 10s
+
+  shard2-a:
+    container_name: shard2-a
+    hostname: shard2-a
+    image: mongo:latest
+    restart: always
+    networks:
+      - app-network
+    volumes:
+      - shard2-a-data:/data/db
+    command:
+      [
+        "--shardsvr",
+        "--replSet",
+        "rs02",
+        "--bind_ip_all",
+        "--port",
+        "27018"
+      ]
+    healthcheck:
+      test: [ "CMD", "mongo", "--eval", "db.adminCommand('ping')" ]
+      interval: 5s
+      start_period: 10s
+
+  shard2-b:
+    container_name: shard2-b
+    hostname: shard2-b
+    image: mongo:latest
+    restart: always
+    networks:
+      - app-network
+    volumes:
+      - shard2-b-data:/data/db
+    command:
+      [
+        "--shardsvr",
+        "--replSet",
+        "rs02",
+        "--bind_ip_all",
+        "--port",
+        "27018"
+      ]
+    healthcheck:
+      test: [ "CMD", "mongo", "--eval", "db.adminCommand('ping')" ]
+      interval: 5s
+      start_period: 10s
+
+  shard2-c:
+    container_name: shard2-c
+    hostname: shard2-c
+    image: mongo:latest
+    restart: always
+    networks:
+      - app-network
+    volumes:
+      - shard2-c-data:/data/db
+    command:
+      [
+        "--shardsvr",
+        "--replSet",
+        "rs02",
+        "--bind_ip_all",
+        "--port",
+        "27018"
+      ]
+    healthcheck:
+      test: [ "CMD", "mongo", "--eval", "db.adminCommand('ping')" ]
+      interval: 5s
+      start_period: 10s
+
+  pymongo_api:
+    container_name: pymongo_api
+    networks:
+      - app-network
+    build:
+      context: api_app
+      dockerfile: Dockerfile
+    depends_on:
+      - shard1-a
+      - shard1-b
+      - shard2-a
+      - router
+      - config
+      - redis
+    ports:
+      - 8080:8080
+    environment:
+      MONGODB_URL: "mongodb://sharding-repl-cache-router-1:27017,sharding-repl-cache-router-2:27017"
+      MONGODB_DATABASE_NAME: "somedb"
+      REDIS_URL: "redis://sharding-repl-cache-redis-1:6379"
+
+  redis:
+    image: "redis:latest"
+    volumes:
+      - ./redis/redis.conf:/usr/local/etc/redis/redis.conf
+    command: [ "redis-server", "/usr/local/etc/redis/redis.conf" ]
+    networks:
+      - app-network
+#    deploy:
+#      replicas: 6  # для кластерного redis
+
+networks:
+  app-network:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 173.17.0.0/16
+
+volumes:
+  config-data:
+  shard1-a-data:
+  shard1-b-data:
+  shard1-c-data:
+  shard2-a-data:
+  shard2-b-data:
+  shard2-c-data:
