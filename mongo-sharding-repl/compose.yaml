@@ -45,13 +45,15 @@ services:
     deploy:
       replicas: 2
 
-  shard1:
+  shard1-a:
+    container_name: shard1-a
+    hostname: shard1-a
     image: mongo:latest
     restart: always
     networks:
       - app-network
     volumes:
-      - shard1-data:/data/db
+      - shard1-a-data:/data/db
     command:
       [
         "--shardsvr",
@@ -65,16 +67,62 @@ services:
       test: [ "CMD", "mongo", "--eval", "db.adminCommand('ping')" ]
       interval: 5s
       start_period: 10s
-#    deploy:
-#      replicas: 3
 
-  shard2:
+  shard1-b:
+    container_name: shard1-b
+    hostname: shard1-b
     image: mongo:latest
     restart: always
     networks:
       - app-network
     volumes:
-      - shard2-data:/data/db
+      - shard1-b-data:/data/db
+    command:
+      [
+        "--shardsvr",
+        "--replSet",
+        "rs01",
+        "--bind_ip_all",
+        "--port",
+        "27018"
+      ]
+    healthcheck:
+      test: [ "CMD", "mongo", "--eval", "db.adminCommand('ping')" ]
+      interval: 5s
+      start_period: 10s
+
+  shard1-c:
+    container_name: shard1-c
+    hostname: shard1-c
+    image: mongo:latest
+    restart: always
+    networks:
+      - app-network
+    volumes:
+      - shard1-c-data:/data/db
+    command:
+      [
+        "--shardsvr",
+        "--replSet",
+        "rs01",
+        "--bind_ip_all",
+        "--port",
+        "27018"
+      ]
+    healthcheck:
+      test: [ "CMD", "mongo", "--eval", "db.adminCommand('ping')" ]
+      interval: 5s
+      start_period: 10s
+
+  shard2-a:
+    container_name: shard2-a
+    hostname: shard2-a
+    image: mongo:latest
+    restart: always
+    networks:
+      - app-network
+    volumes:
+      - shard2-a-data:/data/db
     command:
       [
         "--shardsvr",
@@ -88,8 +136,52 @@ services:
       test: [ "CMD", "mongo", "--eval", "db.adminCommand('ping')" ]
       interval: 5s
       start_period: 10s
-#    deploy:
-#      replicas: 3
+
+  shard2-b:
+    container_name: shard2-b
+    hostname: shard2-b
+    image: mongo:latest
+    restart: always
+    networks:
+      - app-network
+    volumes:
+      - shard2-b-data:/data/db
+    command:
+      [
+        "--shardsvr",
+        "--replSet",
+        "rs02",
+        "--bind_ip_all",
+        "--port",
+        "27018"
+      ]
+    healthcheck:
+      test: [ "CMD", "mongo", "--eval", "db.adminCommand('ping')" ]
+      interval: 5s
+      start_period: 10s
+
+  shard2-c:
+    container_name: shard2-c
+    hostname: shard2-c
+    image: mongo:latest
+    restart: always
+    networks:
+      - app-network
+    volumes:
+      - shard2-c-data:/data/db
+    command:
+      [
+        "--shardsvr",
+        "--replSet",
+        "rs02",
+        "--bind_ip_all",
+        "--port",
+        "27018"
+      ]
+    healthcheck:
+      test: [ "CMD", "mongo", "--eval", "db.adminCommand('ping')" ]
+      interval: 5s
+      start_period: 10s
 
   pymongo_api:
     container_name: pymongo_api
@@ -99,8 +191,11 @@ services:
       context: api_app
       dockerfile: Dockerfile
     depends_on:
-      - shard1
-      - shard2
+      - shard1-a
+      - shard1-b
+      - shard2-a
+      - router
+      - config
     ports:
       - 8080:8080
     environment:
@@ -118,10 +213,12 @@ networks:
 
 volumes:
   config-data:
-  shard1-data:
-  shard2-data:
-
-
+  shard1-a-data:
+  shard1-b-data:
+  shard1-c-data:
+  shard2-a-data:
+  shard2-b-data:
+  shard2-c-data:
 
 # 1. отвязаться от имени папки!
 # 2. запустить с репликами
